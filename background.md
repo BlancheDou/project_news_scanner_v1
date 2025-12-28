@@ -1,0 +1,1 @@
+Our project's primary strategic focus is automatically monitors important US financial market (including equities (SPY, QQQ, big tech), USD, US Treasuries, crypto, and gold.) tickers price changes; fetches, filters, and analyzes most recent financial news to gather information and find out key driving factors for these price changes. 
