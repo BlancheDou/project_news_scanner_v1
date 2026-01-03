@@ -97,8 +97,6 @@ project_news_scanner_v1/
    SUPER_MIND_API_KEY=your_supermind_api_key_here
    POLYGON_API_KEY=your_polygon_api_key_here
    OPENAI_API_KEY=your_openai_api_key_here  # Optional: for faster LLM scoring
-   USE_OPENAI_FOR_SCORING=true  # Set to "true" to use OpenAI for scoring (faster, default: true)
-   OPENAI_MODEL_FOR_SCORING=gpt-5-mini  # OpenAI model to use for scoring (default: gpt-5-mini)
    ```
 
 5. **Create background.md**:
