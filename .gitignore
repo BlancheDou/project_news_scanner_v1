@@ -10,4 +10,7 @@ ENV/
 .venv
 *.log
 .DS_Store
+cursor_system_prompt.md
+product_definition_brief.md
+background.md
 

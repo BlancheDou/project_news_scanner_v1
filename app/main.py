@@ -10,7 +10,7 @@ from app.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-app = FastAPI(title="US Market News Impact Monitor")
+app = FastAPI(title="Stock Event AI")
 
 # Global monitoring service instance
 monitoring_service = MonitoringService()
@@ -34,7 +34,7 @@ async def root():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>US Market News Impact Monitor</title>
+        <title>Stock Event AI</title>
         <style>
             * {
                 margin: 0;
@@ -199,7 +199,7 @@ async def root():
     </head>
     <body>
         <div class="container">
-            <h1>📈 US Market News Impact Monitor</h1>
+            <h1>📈 Stock Event AI</h1>
             <p class="subtitle">Automated monitoring and analysis of significant market movements</p>
             
             <div class="controls">
@@ -445,8 +445,8 @@ async def analyze_market():
         # If no significant movements, still analyze all tickers
         if not movements:
             # Get price changes for all tickers
-            from app.services.databento_client import DatabentoClient
-            client = DatabentoClient()
+            from app.services.polygon_client import PolygonClient
+            client = PolygonClient()
             movements = []
             for ticker in Config.MONITORED_TICKERS:
                 price_change = client.get_price_change(ticker, hours=1)

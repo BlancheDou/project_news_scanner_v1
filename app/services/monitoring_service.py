@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import pytz
 from app.config import Config
-from app.services.databento_client import DatabentoClient
+from app.services.polygon_client import PolygonClient
 from app.services.ai_builder_client import AIBuilderClient
 from app.services.news_filter import NewsFilter
 from app.logger import setup_logger, log_agent_decision, log_system_output
@@ -16,7 +16,7 @@ class MonitoringService:
     
     def __init__(self):
         """Initialize monitoring service."""
-        self.databento_client = DatabentoClient()
+        self.polygon_client = PolygonClient()
         self.ai_client = AIBuilderClient()
         self.news_filter = NewsFilter(self.ai_client)
         self.background_context = self._load_background_context()
@@ -46,7 +46,7 @@ class MonitoringService:
         significant_movements = []
         
         for ticker in Config.MONITORED_TICKERS:
-            price_change = self.databento_client.get_price_change(ticker, hours=1)
+            price_change = self.polygon_client.get_price_change(ticker, hours=1)
             
             if price_change is None:
                 continue

@@ -12,11 +12,24 @@ class AIBuilderClient:
     def __init__(self):
         """Initialize OpenAI client with AI Builder configuration."""
         log_agent_decision(logger, "AIBuilderClient.__init__")
+        # AI Builder client (used for news search and analysis)
         self.client = openai.OpenAI(
             api_key=Config.SUPER_MIND_API_KEY,
             base_url=Config.OPENAI_BASE_URL
         )
         log_system_output(logger, "AI Builder client initialized")
+        
+        # OpenAI client (used for scoring if configured)
+        self.openai_client = None
+        if Config.USE_OPENAI_FOR_SCORING:
+            if not Config.OPENAI_API_KEY:
+                logger.warning("USE_OPENAI_FOR_SCORING is True but OPENAI_API_KEY is not set. Falling back to AI Builder API.")
+            else:
+                self.openai_client = openai.OpenAI(
+                    api_key=Config.OPENAI_API_KEY
+                    # Uses default OpenAI base URL
+                )
+                log_system_output(logger, f"OpenAI client initialized for scoring (model: {Config.OPENAI_MODEL_FOR_SCORING})")
     
     def search_news(self, query: str, max_results: int = 10) -> List[Dict]:
         """
@@ -173,7 +186,10 @@ Write your response in plain text format, using clear section headers. Do not us
     
     def score_news_relevance(self, news_article: Dict, background_context: str, ticker: str) -> float:
         """
-        Score news article relevance using LLM.
+        Score news article relevance using LLM with retry logic and adaptive token limits.
+        
+        Uses OpenAI GPT-5 if USE_OPENAI_FOR_SCORING is True, otherwise uses AI Builder API.
+        Implements retry logic with exponential backoff for robust scoring.
         
         Args:
             news_article: News article dict
@@ -183,9 +199,9 @@ Write your response in plain text format, using clear section headers. Do not us
         Returns:
             Relevance score between 0 and 1
         """
-        log_agent_decision(logger, f"score_news_relevance(ticker={ticker})")
-        try:
-            prompt = f"""Rate the relevance of this news article to our strategic goals and the ticker {ticker}.
+        log_agent_decision(logger, f"score_news_relevance(ticker={ticker}, using={'OpenAI' if Config.USE_OPENAI_FOR_SCORING and self.openai_client else 'AI Builder'})")
+        
+        prompt = f"""Rate the relevance of this news article to our strategic goals and the ticker {ticker}.
 
 Strategic Context:
 {background_context}
@@ -199,25 +215,128 @@ Rate the relevance on a scale of 0.0 to 1.0, where:
 - 0.5 = Moderately relevant
 - 0.0 = Not relevant
 
-Respond with only a number between 0.0 and 1.0."""
+IMPORTANT: Respond with ONLY a single number between 0.0 and 1.0. Do not include any text, explanation, or formatting. Just the number."""
+        
+        # Retry logic with adaptive token limits
+        max_retries = 3
+        token_limits = [100, 200, 500]  # Progressive token limits for retries
+        
+        for attempt in range(max_retries):
+            try:
+                # Use OpenAI if configured, otherwise use AI Builder
+                if Config.USE_OPENAI_FOR_SCORING and self.openai_client:
+                    client = self.openai_client
+                    model = Config.OPENAI_MODEL_FOR_SCORING
+                    max_tokens = token_limits[attempt] if attempt < len(token_limits) else token_limits[-1]
+                    
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_completion_tokens=max_tokens
+                    )
+                else:
+                    client = self.client
+                    model = Config.OPENAI_MODEL
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.3,
+                        max_tokens=10
+                    )
+                
+                if not response.choices or len(response.choices) == 0:
+                    logger.warning(f"Attempt {attempt + 1}: No choices in API response")
+                    if attempt < max_retries - 1:
+                        continue
+                    return 0.5
+                
+                choice = response.choices[0]
+                message = choice.message
+                finish_reason = choice.finish_reason
+                
+                # Check if response was cut off due to token limit
+                if finish_reason == 'length':
+                    logger.warning(f"Attempt {attempt + 1}: Response truncated (finish_reason=length), retrying with more tokens")
+                    if attempt < max_retries - 1:
+                        continue
+                    # Last attempt - try to parse what we have
+                
+                score_text = message.content.strip() if message.content else ""
+                
+                # Parse score from response
+                score = self._parse_score_from_response(score_text)
+                
+                if score is not None:
+                    log_system_output(logger, f"Relevance score: {score} (attempt {attempt + 1})")
+                    return score
+                else:
+                    logger.warning(f"Attempt {attempt + 1}: Could not parse score from: '{score_text}'")
+                    if attempt < max_retries - 1:
+                        continue
+                    
+            except Exception as e:
+                logger.error(f"Attempt {attempt + 1}: Error scoring news: {str(e)}")
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(0.5 * (attempt + 1))  # Exponential backoff
+                    continue
+                return 0.5
+        
+        # All retries failed
+        logger.warning(f"All {max_retries} attempts failed, using fallback score 0.5")
+        return 0.5
+    
+    def _parse_score_from_response(self, score_text: str) -> float:
+        """
+        Parse relevance score from API response text.
+        
+        Args:
+            score_text: Raw response text from API
             
-            response = self.client.chat.completions.create(
-                model=Config.OPENAI_MODEL,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=10
-            )
-            
-            score_text = response.choices[0].message.content.strip()
-            score = float(score_text) if score_text.replace('.', '').isdigit() else 0.5
-            log_system_output(logger, f"Relevance score: {score}")
-            return score
-            
-        except Exception as e:
-            logger.error(f"Error scoring news: {str(e)}")
-            return 0.5
+        Returns:
+            Parsed score (0.0-1.0) or None if parsing fails
+        """
+        import re
+        
+        if not score_text:
+            return None
+        
+        # Try multiple parsing strategies
+        # Strategy 1: Extract decimal number (0.0 to 1.0)
+        decimal_match = re.search(r'\b(0\.\d+|1\.0|1\.00|0\.0|1\.0?)\b', score_text)
+        if decimal_match:
+            try:
+                score = float(decimal_match.group(1))
+                return max(0.0, min(1.0, score))
+            except ValueError:
+                pass
+        
+        # Strategy 2: Extract any float and normalize to 0-1
+        float_match = re.search(r'(\d+\.?\d*)', score_text)
+        if float_match:
+            try:
+                score = float(float_match.group(1))
+                # Normalize if it's a percentage (0-100) or other scale
+                if score > 1.0:
+                    score = score / 100.0 if score <= 100 else score / 1000.0
+                return max(0.0, min(1.0, score))
+            except ValueError:
+                pass
+        
+        # Strategy 3: Look for percentage format (e.g., "50%", "0.5%")
+        percent_match = re.search(r'(\d+\.?\d*)\s*%', score_text)
+        if percent_match:
+            try:
+                score = float(percent_match.group(1)) / 100.0
+                return max(0.0, min(1.0, score))
+            except ValueError:
+                pass
+        
+        return None
     
     def _parse_news_response(self, content: str, query: str, max_results: int = 10) -> List[Dict]:
         """Parse news search response into structured format."""

@@ -101,6 +101,9 @@ project_news_scanner_v1/
    ```
    SUPER_MIND_API_KEY=your_supermind_api_key_here
    DATABENTO_API_KEY=your_databento_api_key_here
+   OPENAI_API_KEY=your_openai_api_key_here  # Optional: for faster LLM scoring
+   USE_OPENAI_FOR_SCORING=false  # Set to "true" to use OpenAI GPT-5 for scoring (faster)
+   OPENAI_MODEL_FOR_SCORING=gpt-5  # OpenAI model to use for scoring (default: gpt-5)
    ```
 
 5. **Ensure background.md exists**:
@@ -178,6 +181,8 @@ Key configuration options in `app/config.py`:
 - `PRICE_CHANGE_THRESHOLD`: Threshold for significant movement (default: 0.005 = 0.5%)
 - `MONITORING_INTERVAL_HOURS`: How often to check (default: 1 hour)
 - `TIMEZONE`: Timezone for market hours (default: "America/New_York")
+- `USE_OPENAI_FOR_SCORING`: Use OpenAI GPT-5 for LLM scoring instead of AI Builder API (default: false, set to "true" in .env for faster scoring)
+- `OPENAI_MODEL_FOR_SCORING`: OpenAI model to use for scoring (default: "gpt-5")
 
 ## Technology Stack
 

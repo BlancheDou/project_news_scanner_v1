@@ -42,12 +42,38 @@ class NewsFilter:
         
         Filters out articles that don't mention relevant keywords.
         """
-        keywords = [
+        # Build ticker variations (e.g., TSLA -> tsla, TSLA, Tesla, TESLA)
+        ticker_variations = [
             ticker.lower(),
-            "market", "financial", "economy", "fed", "federal reserve",
-            "inflation", "cpi", "earnings", "stock", "equity",
-            "treasury", "bond", "crypto", "bitcoin", "gold"
+            ticker.upper(),
+            ticker.capitalize(),
+            ticker.title()
         ]
+        
+        # Map ticker to company name if applicable
+        ticker_to_company = {
+            "TSLA": ["tesla", "tesla inc", "tesla motors"],
+            "SPY": ["spy", "s&p 500", "sp500"],
+            "QQQ": ["qqq", "nasdaq"],
+            "GLD": ["gld", "gold"],
+            "BTC": ["bitcoin", "btc", "crypto", "cryptocurrency"]
+        }
+        
+        # Add company name variations if available
+        if ticker in ticker_to_company:
+            ticker_variations.extend(ticker_to_company[ticker])
+        
+        # General financial keywords
+        financial_keywords = [
+            "market", "financial", "economy", "fed", "federal reserve",
+            "inflation", "cpi", "earnings", "stock", "equity", "shares",
+            "treasury", "bond", "crypto", "bitcoin", "gold",
+            "trading", "investor", "investment", "price", "share price",
+            "revenue", "profit", "loss", "quarterly", "annual"
+        ]
+        
+        # Combine all keywords
+        keywords = ticker_variations + financial_keywords
         
         filtered = []
         for article in articles:
@@ -56,7 +82,12 @@ class NewsFilter:
             content = f"{title} {snippet}"
             
             # Check if article contains relevant keywords
-            if any(keyword in content for keyword in keywords):
+            # For ticker-specific news, be more lenient - if ticker is mentioned, include it
+            # Otherwise, check for financial keywords
+            ticker_mentioned = any(variation.lower() in content for variation in ticker_variations)
+            financial_mentioned = any(keyword in content for keyword in financial_keywords)
+            
+            if ticker_mentioned or financial_mentioned:
                 filtered.append(article)
         
         return filtered
