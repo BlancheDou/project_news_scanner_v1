@@ -41,7 +41,11 @@ class NewsFilter:
         Rule-based filtering stage.
         
         Filters out articles that don't mention relevant keywords.
+        For ticker-specific searches, this filter is lenient since search results are already relevant.
         """
+        if not articles:
+            return []
+        
         # Build ticker variations (e.g., TSLA -> tsla, TSLA, Tesla, TESLA)
         ticker_variations = [
             ticker.lower(),
@@ -52,10 +56,10 @@ class NewsFilter:
         
         # Map ticker to company name if applicable
         ticker_to_company = {
-            "TSLA": ["tesla", "tesla inc", "tesla motors"],
-            "SPY": ["spy", "s&p 500", "sp500"],
-            "QQQ": ["qqq", "nasdaq"],
-            "GLD": ["gld", "gold"],
+            "TSLA": ["tesla", "tesla inc", "tesla motors", "tesla's", "teslas"],
+            "SPY": ["spy", "s&p 500", "sp500", "s&p500"],
+            "QQQ": ["qqq", "nasdaq", "nasdaq-100"],
+            "GLD": ["gld", "gold", "gold etf"],
             "BTC": ["bitcoin", "btc", "crypto", "cryptocurrency"]
         }
         
@@ -63,32 +67,51 @@ class NewsFilter:
         if ticker in ticker_to_company:
             ticker_variations.extend(ticker_to_company[ticker])
         
-        # General financial keywords
+        # General financial keywords (expanded list)
         financial_keywords = [
-            "market", "financial", "economy", "fed", "federal reserve",
-            "inflation", "cpi", "earnings", "stock", "equity", "shares",
-            "treasury", "bond", "crypto", "bitcoin", "gold",
-            "trading", "investor", "investment", "price", "share price",
-            "revenue", "profit", "loss", "quarterly", "annual"
+            "market", "markets", "financial", "finance", "economy", "economic",
+            "fed", "federal reserve", "federal", "reserve",
+            "inflation", "cpi", "earnings", "stock", "stocks", "equity", "equities", "shares",
+            "treasury", "bond", "bonds", "crypto", "bitcoin", "gold",
+            "trading", "trader", "traders", "investor", "investors", "investment", "investments",
+            "price", "prices", "share price", "share prices", "stock price", "stock prices",
+            "revenue", "revenues", "profit", "profits", "loss", "losses", "quarterly", "annual",
+            "company", "companies", "corporate", "business", "businesses",
+            "shares", "shareholder", "shareholders", "ipo", "dividend", "dividends"
         ]
         
-        # Combine all keywords
-        keywords = ticker_variations + financial_keywords
-        
         filtered = []
-        for article in articles:
-            title = article.get('title', '').lower()
-            snippet = article.get('snippet', '').lower()
+        for i, article in enumerate(articles):
+            # Debug: Log article structure for first few articles
+            if i < 3:
+                log_system_output(logger, f"Article {i} keys: {list(article.keys())}")
+                log_system_output(logger, f"Article {i} title: {article.get('title', 'N/A')[:100]}")
+                log_system_output(logger, f"Article {i} snippet: {article.get('snippet', 'N/A')[:100]}")
+            
+            # Get article content - check multiple possible fields
+            title = (article.get('title') or article.get('headline') or '').lower()
+            snippet = (article.get('snippet') or article.get('summary') or article.get('description') or '').lower()
             content = f"{title} {snippet}"
             
+            # If content is empty, include the article anyway (let LLM decide)
+            if not content.strip():
+                log_system_output(logger, f"Article {i} has no content, including anyway")
+                filtered.append(article)
+                continue
+            
             # Check if article contains relevant keywords
-            # For ticker-specific news, be more lenient - if ticker is mentioned, include it
-            # Otherwise, check for financial keywords
             ticker_mentioned = any(variation.lower() in content for variation in ticker_variations)
             financial_mentioned = any(keyword in content for keyword in financial_keywords)
             
-            if ticker_mentioned or financial_mentioned:
+            if i < 3:
+                log_system_output(logger, f"Article {i} - Ticker mentioned: {ticker_mentioned}, Financial mentioned: {financial_mentioned}")
+            
+            # More lenient: include if ticker OR financial keywords OR if it's a short list (likely already filtered by search)
+            # Since we're searching for ticker-specific news, most results should be relevant
+            if ticker_mentioned or financial_mentioned or len(articles) <= 5:
                 filtered.append(article)
+            elif i < 3:
+                log_system_output(logger, f"Article {i} filtered out - no matching keywords. Content: {content[:150]}")
         
         return filtered
     

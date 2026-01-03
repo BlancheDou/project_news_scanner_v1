@@ -229,13 +229,28 @@ IMPORTANT: Respond with ONLY a single number between 0.0 and 1.0. Do not include
                     model = Config.OPENAI_MODEL_FOR_SCORING
                     max_tokens = token_limits[attempt] if attempt < len(token_limits) else token_limits[-1]
                     
-                    response = client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            {"role": "user", "content": prompt}
-                        ],
-                        max_completion_tokens=max_tokens
-                    )
+                    # Try max_completion_tokens first (for newer models), fallback to max_tokens for compatibility
+                    try:
+                        response = client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "user", "content": prompt}
+                            ],
+                            max_completion_tokens=max_tokens
+                        )
+                    except TypeError as e:
+                        # Fallback to max_tokens if SDK doesn't support max_completion_tokens
+                        if "max_completion_tokens" in str(e):
+                            logger.warning(f"max_completion_tokens not supported, falling back to max_tokens")
+                            response = client.chat.completions.create(
+                                model=model,
+                                messages=[
+                                    {"role": "user", "content": prompt}
+                                ],
+                                max_tokens=max_tokens
+                            )
+                        else:
+                            raise
                 else:
                     client = self.client
                     model = Config.OPENAI_MODEL
