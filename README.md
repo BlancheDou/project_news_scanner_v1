@@ -1,6 +1,6 @@
-# US Market News Impact Monitor
+# Stock Event AI
 
-An MVP web application that automatically monitors and detects large price movements of important tickers in US markets (including equities SPY, QQQ, big tech, USD, US Treasuries, crypto, and gold), fetches, filters, and analyzes financial news to find the driving factors for these price movements.
+An MVP web application that automatically monitors and detects large price movements of important tickers in US markets (e.g. SPY, QQQ, big tech, USD, US Treasuries, crypto, and gold), fetches, filters, and analyzes financial news to find the driving factors for these price movements.
 
 ## Project Structure
 
