@@ -7,7 +7,6 @@ load_dotenv()
 class Config:
     """Application configuration."""
     SUPER_MIND_API_KEY = os.getenv("SUPER_MIND_API_KEY")
-    DATABENTO_API_KEY = os.getenv("DATABENTO_API_KEY")  # Deprecated, kept for backward compatibility
     POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENAI_BASE_URL = "https://space.ai-builders.com/backend/v1"

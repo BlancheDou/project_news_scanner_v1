@@ -13,23 +13,21 @@ project_news_scanner_v1/
 │   ├── main.py                # FastAPI application and routes
 │   └── services/
 │       ├── __init__.py
-│       ├── databento_client.py    # Databento API client for market data
+│       ├── polygon_client.py      # Polygon.io API client for market data
 │       ├── ai_builder_client.py   # AI Builder API client for news & LLM
 │       ├── news_filter.py         # Two-stage news filtering service
 │       └── monitoring_service.py  # Price monitoring and analysis orchestration
-├── background.md              # Strategic context file
-├── product_definition_brief.md
-├── cursor_system_prompt.md
 ├── requirements.txt          # Python dependencies
-├── .env.example             # Environment variables template
 ├── .gitignore
 └── README.md                # This file
 ```
 
+**Note**: Internal documentation files (`background.md`, `product_definition_brief.md`, `cursor_system_prompt.md`) are excluded from version control via `.gitignore`. Create `background.md` in the project root for strategic context.
+
 ## Key Features
 
 ### 1. Automatic Price Monitoring & Analysis
-- **Monitored Tickers**: SPY, QQQ, GLD, BTC
+- **Monitored Tickers**: Configurable (default: TSLA, can be set to SPY, QQQ, GLD, BTC, or other tickers)
 - **Monitoring Frequency**: Every hour (based on New York time)
 - **Threshold**: Detects movements >0.5% (hourly change)
 - **Workflow**: When large movement detected → fetch news → filter news → deep-dive LLM analysis
@@ -94,20 +92,17 @@ project_news_scanner_v1/
    ```
 
 4. **Set up environment variables**:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and add your API keys:
+   Create a `.env` file in the project root and add your API keys:
    ```
    SUPER_MIND_API_KEY=your_supermind_api_key_here
-   DATABENTO_API_KEY=your_databento_api_key_here
+   POLYGON_API_KEY=your_polygon_api_key_here
    OPENAI_API_KEY=your_openai_api_key_here  # Optional: for faster LLM scoring
-   USE_OPENAI_FOR_SCORING=false  # Set to "true" to use OpenAI GPT-5 for scoring (faster)
-   OPENAI_MODEL_FOR_SCORING=gpt-5  # OpenAI model to use for scoring (default: gpt-5)
+   USE_OPENAI_FOR_SCORING=true  # Set to "true" to use OpenAI for scoring (faster, default: true)
+   OPENAI_MODEL_FOR_SCORING=gpt-5-mini  # OpenAI model to use for scoring (default: gpt-5-mini)
    ```
 
-5. **Ensure background.md exists**:
-   The application reads strategic context from `background.md` in the project root.
+5. **Create background.md**:
+   Create a `background.md` file in the project root with your strategic context. The application reads this file to guide its analysis.
 
 ## Running the Application
 
@@ -140,10 +135,11 @@ http://localhost:8000
 - Loads environment variables
 - Defines monitored tickers, thresholds, and API settings
 
-### `app/services/databento_client.py`
-- Interfaces with Databento API for market data
+### `app/services/polygon_client.py`
+- Interfaces with Polygon.io API for market data
 - Fetches price changes for monitored tickers
-- Handles symbol mapping and dataset selection
+- Handles symbol mapping and timezone-aware queries
+- Supports both latest price and historical price change queries
 
 ### `app/services/ai_builder_client.py`
 - Interfaces with AI Builder Student Portal API
@@ -177,19 +173,20 @@ http://localhost:8000
 ## Configuration
 
 Key configuration options in `app/config.py`:
-- `MONITORED_TICKERS`: List of tickers to monitor (default: ["SPY", "QQQ", "GLD", "BTC"])
+- `MONITORED_TICKERS`: List of tickers to monitor (default: ["TSLA"], can be configured to ["SPY", "QQQ", "GLD", "BTC"])
 - `PRICE_CHANGE_THRESHOLD`: Threshold for significant movement (default: 0.005 = 0.5%)
 - `MONITORING_INTERVAL_HOURS`: How often to check (default: 1 hour)
 - `TIMEZONE`: Timezone for market hours (default: "America/New_York")
-- `USE_OPENAI_FOR_SCORING`: Use OpenAI GPT-5 for LLM scoring instead of AI Builder API (default: false, set to "true" in .env for faster scoring)
-- `OPENAI_MODEL_FOR_SCORING`: OpenAI model to use for scoring (default: "gpt-5")
+- `USE_OPENAI_FOR_SCORING`: Use OpenAI for LLM scoring instead of AI Builder API (default: true, faster scoring)
+- `OPENAI_MODEL_FOR_SCORING`: OpenAI model to use for scoring (default: "gpt-5-mini")
 
 ## Technology Stack
 
 - **Backend**: FastAPI (Python web framework)
 - **Frontend**: HTML5, JavaScript (vanilla)
-- **Market Data**: Databento API
+- **Market Data**: Polygon.io API
 - **News & AI**: AI Builder Student Portal API (OpenAI SDK)
+- **LLM Scoring**: OpenAI GPT-5-mini (configurable, faster than AI Builder API)
 - **Logging**: Python logging module
 - **Environment**: python-dotenv
 
@@ -211,8 +208,9 @@ To modify the application:
 
 ## Troubleshooting
 
-- **API Errors**: Ensure your `.env` file has valid API keys
-- **No Data**: Check Databento API access and symbol availability
-- **News Search Issues**: Verify AI Builder API key and base URL
-- **Monitoring Not Working**: Check console logs for errors and ensure market hours
+- **API Errors**: Ensure your `.env` file has valid API keys (especially `POLYGON_API_KEY` and `SUPER_MIND_API_KEY`)
+- **No Data**: Check Polygon.io API access and symbol availability. Verify your API key has access to the tickers you're monitoring
+- **News Search Issues**: Verify AI Builder API key (`SUPER_MIND_API_KEY`) and base URL
+- **Monitoring Not Working**: Check console logs for errors and ensure market hours. Verify `background.md` exists in project root
+- **Price Data Issues**: Ensure Polygon.io API key is valid and has access to the market data endpoints
 
